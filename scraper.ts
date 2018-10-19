@@ -314,7 +314,7 @@ function parseApplicationElements(elements: Element[], startElement: Element, in
 
 // Finds the start element of each development application on the current PDF page (there are
 // typically two development applications on a single page and each development application
-// typically begins with the text "Valuation Num:").
+// typically begins with the text "Lodgement").
 
 function findStartElements(elements: Element[]) {
     // Examine all the elements on the page that being with "V" or "v".
@@ -403,9 +403,9 @@ async function parsePdf(url: string) {
         let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
         elements.sort(elementComparer);
 
-        // Group the elements into sections based on where the "Valuation Num:" text starts (and
-        // any other element the "Valuation Num:" elements line up with horizontally with a margin
-        // of error equal to about half the height of the "Valuation Num:" text).
+        // Group the elements into sections based on where the "Lodgement" text starts (and other
+        // element the "Lodgement" elements line up with horizontally with a margin of error equal
+        // to about half the height of the "Lodgement" text).
 
         let applicationElementGroups = [];
         let startElements = findStartElements(elements);
@@ -428,6 +428,22 @@ async function parsePdf(url: string) {
 
             applicationElementGroups.push({ startElement: startElements[index], elements: elements.filter(element => element.y >= rowTop && element.y + element.height < nextRowTop) });
         }
+
+        // Find the "Applicant" column heading on the current page.
+
+        let applicantElement = elements.find(element => element.text.trim() == "Applicant");
+    
+        // Find the "Application Date" column heading on the current page.
+
+        let applicationElement = elements.find(element => element.text.trim() == "Application");
+
+        // Find the "Subject Land" column heading on the current page.
+
+        let subjectLandElement = elements.find(element => element.text.trim() == "Subject Land");
+
+        // Find the "Proposal" column heading on the current page.
+
+        let proposalElement = elements.find(element => element.text.trim() == "Proposal");
 
         // Parse the development application from each group of elements (ie. a section of the
         // current page of the PDF document).  If the same application number is encountered a
