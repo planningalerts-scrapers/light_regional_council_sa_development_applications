@@ -1,13 +1,27 @@
 {
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "engines": {
+    "node": "10.6.0"
+  },
   "main": "scraper.js",
   "dependencies": {
-    "cheerio": "latest",
-    "request": "latest",
-    "sqlite3": "latest"
+    "cheerio": "^0.22.0",
+    "didyoumean2": "^1.3.0",
+    "fs": "0.0.1-security",
+    "moment": "^2.22.2",
+    "path": "^0.12.7",
+    "pdfjs-dist": "^2.0.550",
+    "request": "^2.87.0",
+    "request-promise-native": "^1.0.5",
+    "sqlite3": "^4.0.1",
+    "url": "^0.11.0"
   },
   "keywords": [
     "scraper",
     "morph"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^10.5.7",
+    "typescript": "^3.0.1"
+  }
 }

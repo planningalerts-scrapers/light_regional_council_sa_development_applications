@@ -1,0 +1,15 @@
+{
+    "compileOnSave": true,
+    "compilerOptions": {
+        "lib": [
+            "es2018",
+            "dom"
+        ],
+        "target": "es2018",
+        "module": "commonjs",
+        "inlineSourceMap": true
+    },
+    "exclude": [
+        "node_modules"
+    ]
+}

@@ -1,2 +1,11 @@
-# Ignore output of scraper
+# Ignore output of scraper.
 data.sqlite
+
+# Ignore dependency cache.
+node_modules
+package-lock.json
+
+# Ignore most Visual Studio Code files.
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
