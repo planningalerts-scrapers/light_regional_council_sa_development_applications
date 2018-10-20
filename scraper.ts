@@ -159,9 +159,9 @@ function getRightText(elements: Element[], topLeftText: string, rightText: strin
     // Construct a bounding rectangle in which the expected text should appear.  Any elements
     // over 50% within the bounding rectangle will be assumed to be part of the expected text.
 
-    let topLeftElement = elements.find(element => element.text.trim() == topLeftText || element.text.trim() == topLeftText + ":");
-    let rightElement = (rightText === undefined) ? undefined : elements.find(element => element.text.trim() == rightText || element.text.trim() == rightText + ":");
-    let bottomElement = (bottomText === undefined) ? undefined: elements.find(element => element.text.trim() == bottomText || element.text.trim() == bottomText + ":");
+    let topLeftElement = elements.find(element => element.text.trim() === topLeftText || element.text.trim() === topLeftText + ":");
+    let rightElement = (rightText === undefined) ? undefined : elements.find(element => element.text.trim() === rightText || element.text.trim() === rightText + ":");
+    let bottomElement = (bottomText === undefined) ? undefined: elements.find(element => element.text.trim() === bottomText || element.text.trim() === bottomText + ":");
     if (topLeftElement === undefined)
         return undefined;
 
@@ -200,9 +200,9 @@ function getLeftText(elements: Element[], topRightText: string, leftText: string
     // Construct a bounding rectangle in which the expected text should appear.  Any elements
     // over 50% within the bounding rectangle will be assumed to be part of the expected text.
 
-    let topRightElement = elements.find(element => element.text.trim() == topRightText || element.text.trim() == topRightText + ":");
-    let leftElement = (leftText === undefined) ? undefined : elements.find(element => element.text.trim() == leftText || element.text.trim() == leftText + ":");
-    let bottomElement = (bottomText === undefined) ? undefined: elements.find(element => element.text.trim() == bottomText || element.text.trim() == bottomText + ":");
+    let topRightElement = elements.find(element => element.text.trim() === topRightText || element.text.trim() === topRightText + ":");
+    let leftElement = (leftText === undefined) ? undefined : elements.find(element => element.text.trim() === leftText || element.text.trim() === leftText + ":");
+    let bottomElement = (bottomText === undefined) ? undefined: elements.find(element => element.text.trim() === bottomText || element.text.trim() === bottomText + ":");
     if (topRightElement === undefined)
         return undefined;
 
@@ -272,35 +272,35 @@ function formatAddress(address: string) {
 
 // Parses the details from the elements associated with a single development application.
 
-function parseApplicationElements(elements: Element[], startElement: Element, informationUrl: string) {
+function parseApplicationElements(elements: Element[], startElement: Element, headingElements, informationUrl: string) {
     // Get the application number.
 
-    let applicationNumber = getLeftText(elements, "Valuation Num", undefined, "Property");
-    if (applicationNumber === "") {
+    let xComparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
+    let applicationNumberElements = elements
+        .filter(element => element.x < headingElements.applicantElement.x && element.y < startElement.y + 2 * startElement.height)
+        .sort(xComparer);
+
+    let applicationNumber = undefined;
+    for (let index = 1; index <= applicationNumberElements.length; index++) {
+        let text = applicationNumberElements.slice(0, index).map(element => element.text).join("").replace(/\s/g, "");
+        if (/\/[0-9]{4}$/.test(text)) {
+            applicationNumber = text;
+            break;
+        }
+    }
+    if (applicationNumber === undefined) {
         let elementSummary = elements.map(element => `[${element.text}]`).join("");
         console.log(`Could not find the application number on the PDF page for the current development application.  The development application will be ignored.  Elements: ${elementSummary}`);
         return undefined;
     }
     console.log(`    Found \"${applicationNumber}\".`);
 
-    // Get the received date.
-
-    let receivedDateText = getRightText(elements, "Date Approved", undefined, "Approval Type");
-    let receivedDate: moment.Moment = undefined;
-    if (receivedDateText !== undefined)
-        receivedDate = moment(receivedDateText.trim(), "D/MM/YYYY", true);
-
-    // Get the address.
-
-    let address = getRightText(elements, "Property", "Approval Type", "Owner");
-    address = formatAddress(address);
-
-    // Get the description.
-
-    let description = getRightText(elements, "Dev Type", undefined, "Prop Title");
-
     // Construct the resulting application information.
     
+    let address = "";
+    let description = "";
+    let receivedDate = undefined;
+
     return {
         applicationNumber: applicationNumber,
         address: address,
@@ -317,7 +317,7 @@ function parseApplicationElements(elements: Element[], startElement: Element, in
 // typically begins with the text "Lodgement").
 
 function findStartElements(elements: Element[]) {
-    // Examine all the elements on the page that being with "V" or "v".
+    // Examine all the elements on the page that being with "L" or "l".
     
     let startElements: Element[] = [];
     for (let element of elements.filter(element => element.text.trim().toLowerCase().startsWith("l"))) {
@@ -429,21 +429,18 @@ async function parsePdf(url: string) {
             applicationElementGroups.push({ startElement: startElements[index], elements: elements.filter(element => element.y >= rowTop && element.y + element.height < nextRowTop) });
         }
 
-        // Find the "Applicant" column heading on the current page.
+        // Find the main column heading elements.
 
-        let applicantElement = elements.find(element => element.text.trim() == "Applicant");
-    
-        // Find the "Application Date" column heading on the current page.
+        let headingElements = {
+            applicationNumberElement: elements.find(element => element.text.trim() === "Application No."),
+            applicantElement: elements.find(element => element.text.trim() === "Applicant"),
+            applicationElement: elements.find(element => element.text.trim() === "Application"),
+            subjectLandElement: elements.find(element => element.text.trim() === "Subject Land"),
+            proposalElement: elements.find(element => element.text.trim() === "Proposal"),
+            referralsElement: elements.find(element => element.text.trim() === "Referrals/")
+        }
 
-        let applicationElement = elements.find(element => element.text.trim() == "Application");
-
-        // Find the "Subject Land" column heading on the current page.
-
-        let subjectLandElement = elements.find(element => element.text.trim() == "Subject Land");
-
-        // Find the "Proposal" column heading on the current page.
-
-        let proposalElement = elements.find(element => element.text.trim() == "Proposal");
+console.log("Stop if cannot find heading elements.");
 
         // Parse the development application from each group of elements (ie. a section of the
         // current page of the PDF document).  If the same application number is encountered a
@@ -451,11 +448,16 @@ async function parsePdf(url: string) {
         // inserted into the database later instead of being ignored).
 
         for (let applicationElementGroup of applicationElementGroups) {
-            let developmentApplication = parseApplicationElements(applicationElementGroup.elements, applicationElementGroup.startElement, url);
+            let developmentApplication = parseApplicationElements(applicationElementGroup.elements, applicationElementGroup.startElement, headingElements, url);
             if (developmentApplication !== undefined) {
                 let suffix = 0;
                 let applicationNumber = developmentApplication.applicationNumber;
-                while (developmentApplications.some(otherDevelopmentApplication => otherDevelopmentApplication.applicationNumber === developmentApplication.applicationNumber))
+                while (developmentApplications
+                    .some(otherDevelopmentApplication =>
+                        otherDevelopmentApplication.applicationNumber === developmentApplication.applicationNumber &&
+                            (otherDevelopmentApplication.address !== developmentApplication.address ||
+                            otherDevelopmentApplication.description !== developmentApplication.description ||
+                            otherDevelopmentApplication.receivedDate !== developmentApplication.receivedDate)))
                     developmentApplication.applicationNumber = `${applicationNumber} (${++suffix})`;  // add a unique suffix
                 developmentApplications.push(developmentApplication);
             }
