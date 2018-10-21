@@ -193,12 +193,12 @@ function formatAddress(address: string) {
 
 // Parses the details from the elements associated with a single development application.
 
-function parseApplicationElements(elements: Element[], startElement: Element, headingElements, informationUrl: string) {
+function parseApplicationElements(elements: Element[], startElement: Element, applicantElement: Element, applicationElement: Element, proposalElement: Element, referralsElement: Element, informationUrl: string) {
     // Get the application number.
 
     let xComparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
     let applicationNumberElements = elements
-        .filter(element => element.x < headingElements.applicantElement.x && element.y < startElement.y + 2 * startElement.height)
+        .filter(element => element.x < applicantElement.x && element.y < startElement.y + 2 * startElement.height)
         .sort(xComparer);
 
     let applicationNumber = undefined;
@@ -219,7 +219,7 @@ function parseApplicationElements(elements: Element[], startElement: Element, he
     // Get the application date element (text to the right of this constitutes the address).
 
     let applicationDateElement: Element = undefined;
-    let applicationDateRectangle : Rectangle = { x: headingElements.applicationElement.x, y: 0, width: headingElements.applicationElement.width, height : headingElements.applicationElement.height };
+    let applicationDateRectangle : Rectangle = { x: applicationElement.x, y: 0, width: applicationElement.width, height : applicationElement.height };
     for (let element of elements) {
         applicationDateRectangle.y = element.y;
         if (getArea(element) > 0 &&  // ensure a valid element
@@ -238,7 +238,7 @@ function parseApplicationElements(elements: Element[], startElement: Element, he
     // Get the received date.
 
     let receivedDateElement: Element = undefined;
-    let receivedDateRectangle : Rectangle = { x: headingElements.applicationElement.x, y: 0, width: headingElements.applicationElement.width, height : headingElements.applicationElement.height };
+    let receivedDateRectangle : Rectangle = { x: applicationElement.x, y: 0, width: applicationElement.width, height : applicationElement.height };
     for (let element of elements) {
         receivedDateRectangle.y = element.y;
         if (getArea(element) > 0 &&  // ensure a valid element
@@ -263,7 +263,7 @@ function parseApplicationElements(elements: Element[], startElement: Element, he
         .filter(element =>
             element.x > applicationDateElement.x + applicationDateElement.width &&  // the address elements must be to the right of the application date
             getVerticalOverlapPercentage(applicationDateElement, element) > 50 &&  // the address element must overlap vertically with the application date element
-            element.x < headingElements.proposalElement.x - headingElements.proposalElement.height / 2)  // the address element must be at least a little to the left of the "Proposal" heading text (arbitrarily use half the height)
+            element.x < proposalElement.x - proposalElement.height / 2)  // the address element must be at least a little to the left of the "Proposal" heading text (arbitrarily use half the height)
         .sort(xComparer)
         .map(element => element.text)
         .join("");
@@ -272,24 +272,27 @@ function parseApplicationElements(elements: Element[], startElement: Element, he
 
     // Get the description.
 
-    let descriptionElements = elements
-        .filter(element =>
-            element.x > headingElements.proposalElement.x - headingElements.proposalElement.height / 2 &&  // the description elements may start at least a little to the left to the "Proposal" heading
-            element.x < headingElements.referralsElement.x);  // the description elements are to the left of the "Referrals/" heading
-    
     let description = "";
-    let previousY = undefined;
-    for (let descriptionElement of descriptionElements) {
-        if (previousY !== undefined && descriptionElement.y > previousY + descriptionElement.height / 2)  // a new line
-            description += " ";
-        description += descriptionElement.text;
-        previousY = descriptionElement.y;
+
+    if (referralsElement !== undefined) {
+        let descriptionElements = elements
+            .filter(element =>
+                element.x > proposalElement.x - proposalElement.height / 2 &&  // the description elements may start at least a little to the left to the "Proposal" heading
+                element.x < referralsElement.x);  // the description elements are to the left of the "Referrals/" heading
+        
+        let previousY = undefined;
+        for (let descriptionElement of descriptionElements) {
+            if (previousY !== undefined && descriptionElement.y > previousY + descriptionElement.height / 2)  // a new line
+                description += " ";
+            description += descriptionElement.text;
+            previousY = descriptionElement.y;
+        }
     }
 
     return {
         applicationNumber: applicationNumber,
         address: address,
-        description: ((description === "") ? "No Description Provided" : description),
+        description: ((description.trim() === "") ? "No Description Provided" : description),
         informationUrl: informationUrl,
         commentUrl: CommentUrl,
         scrapeDate: moment().format("YYYY-MM-DD"),
@@ -394,6 +397,27 @@ async function parsePdf(url: string) {
         if (/[0-9]+/.test(elements[elements.length - 1].text) && Number(elements[elements.length - 1].text) < 1000)
             elements.pop();
 
+        // Find the main column heading elements.
+
+        let applicantElement = elements.find(element => element.text.trim() === "Applicant");
+        let applicationElement = elements.find(element => element.text.trim() === "Application");
+        let proposalElement = elements.find(element => element.text.trim() === "Proposal");
+        let referralsElement = elements.find(element => element.text.trim() === "Referrals/");
+
+        if (applicantElement === undefined) {
+            let elementSummary = elements.map(element => `[${element.text}]`).join("");
+            console.log(`No development applications can be parsed from the current page because the \"Applicant\" column heading was not found.  Elements: ${elementSummary}`);
+            continue;
+        } else if (applicationElement === undefined) {
+            let elementSummary = elements.map(element => `[${element.text}]`).join("");
+            console.log(`No development applications can be parsed from the current page because the \"Application Date\" column heading was not found.  Elements: ${elementSummary}`);
+            continue;
+        } else if (proposalElement === undefined) {
+            let elementSummary = elements.map(element => `[${element.text}]`).join("");
+            console.log(`No development applications can be parsed from the current page because the \"Proposal\" column heading was not found.  Elements: ${elementSummary}`);
+            continue;
+        }
+
         // Group the elements into sections based on where the "Lodgement" text starts (and other
         // element the "Lodgement" elements line up with horizontally with a margin of error equal
         // to about half the height of the "Lodgement" text).
@@ -420,26 +444,13 @@ async function parsePdf(url: string) {
             applicationElementGroups.push({ startElement: startElements[index], elements: elements.filter(element => element.y >= rowTop && element.y + element.height < nextRowTop) });
         }
 
-        // Find the main column heading elements.
-
-        let headingElements = {
-            applicationNumberElement: elements.find(element => element.text.trim() === "Application No."),
-            applicantElement: elements.find(element => element.text.trim() === "Applicant"),
-            applicationElement: elements.find(element => element.text.trim() === "Application"),
-            subjectLandElement: elements.find(element => element.text.trim() === "Subject Land"),
-            proposalElement: elements.find(element => element.text.trim() === "Proposal"),
-            referralsElement: elements.find(element => element.text.trim() === "Referrals/")
-        }
-
-console.log("Stop if cannot find heading elements.");
-
         // Parse the development application from each group of elements (ie. a section of the
         // current page of the PDF document).  If the same application number is encountered a
         // second time add a suffix to the application number so it is unique (and so will be
         // inserted into the database later instead of being ignored).
 
         for (let applicationElementGroup of applicationElementGroups) {
-            let developmentApplication = parseApplicationElements(applicationElementGroup.elements, applicationElementGroup.startElement, headingElements, url);
+            let developmentApplication = parseApplicationElements(applicationElementGroup.elements, applicationElementGroup.startElement, applicantElement, applicationElement, proposalElement, referralsElement, url);
             if (developmentApplication !== undefined) {
                 let suffix = 0;
                 let applicationNumber = developmentApplication.applicationNumber;
