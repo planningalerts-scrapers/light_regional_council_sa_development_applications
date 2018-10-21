@@ -301,18 +301,16 @@ function parseApplicationElements(elements: Element[], startElement: Element, he
     }
     console.log(`    Found \"${applicationNumber}\".`);
 
-    // Get the received date.
+    // Get the application date element (text to the right of this constitutes the address).
 
-console.log("Consider also extracting the \"Received Date\".");
-
-    let applicationDateElement: Element = undefined;  // moment.Moment = undefined;
+    let applicationDateElement: Element = undefined;
     let applicationDateRectangle : Rectangle = { x: headingElements.applicationElement.x, y: 0, width: headingElements.applicationElement.width, height : headingElements.applicationElement.height };
     for (let element of elements) {
         applicationDateRectangle.y = element.y;
         if (getArea(element) > 0 &&  // ensure a valid element
             getArea(element) > 0.5 * getArea(applicationDateRectangle) &&  // ensure that the element is approximately the same size (within 50%) as what is expected for the date rectangle
             getArea(intersect(element, applicationDateRectangle)) > 0.75 * getArea(element)) {  // determine if the element mostly overlaps (by more than 75%) the rectangle where the date is expected to appear
-                applicationDateElement = element;
+            applicationDateElement = element;
             break;
         }
     }
@@ -322,20 +320,54 @@ console.log("Consider also extracting the \"Received Date\".");
         return undefined;
     }
 
+    // Get the received date.
+
+    let receivedDateElement: Element = undefined;
+    let receivedDateRectangle : Rectangle = { x: headingElements.applicationElement.x, y: 0, width: headingElements.applicationElement.width, height : headingElements.applicationElement.height };
+    for (let element of elements) {
+        receivedDateRectangle.y = element.y;
+        if (getArea(element) > 0 &&  // ensure a valid element
+            getArea(element) > 0.5 * getArea(receivedDateRectangle) &&  // ensure that the element is approximately the same size (within 50%) as what is expected for the date rectangle
+            getArea(intersect(element, receivedDateRectangle)) > 0.75 * getArea(element) &&  // determine if the element mostly overlaps (by more than 75%) the rectangle where the date is expected to appear
+            element.y > applicationDateElement.y + applicationDateElement.height &&  // ignore the application date (the recieved date appears futher down)
+            moment(element.text.trim(), "D/MM/YYYY", true).isValid()) {  // ensure that "Received" and "Date" text are ignored (keep searching until a valid date is found)
+            receivedDateElement = element;
+            break;
+        }
+    }
+
+    if (receivedDateElement === undefined)
+        receivedDateElement = applicationDateElement;  // fallback to the application date
+
     let receivedDate = moment(applicationDateElement.text.trim(), "D/MM/YYYY", true);
     
-    // Get the address.
+    // Get the address (to the right of the application date element and to the left of the
+    // "Proposal" column heading).  The address seems to always be a single line.
 
     let address = elements
         .filter(element =>
-            element.x > applicationDateElement.x + applicationDateElement.width &&  // the address elments must be to the right of the application date
+            element.x > applicationDateElement.x + applicationDateElement.width &&  // the address elements must be to the right of the application date
             getVerticalOverlapPercentage(applicationDateElement, element) > 50 &&  // the address element must overlap vertically with the application date element
             element.x < headingElements.proposalElement.x - headingElements.proposalElement.height / 2)  // the address element must be at least a little to the left of the "Proposal" heading text (arbitrarily use half the height)
         .sort(xComparer)
         .map(element => element.text)
         .join("");
 
+    // Get the description.
+
+    let descriptionElements = elements
+        .filter(element =>
+            element.x > headingElements.proposalElement.x - headingElements.proposalElement.height / 2 &&  // the description elements may start at least a little to the left to the "Proposal" heading
+            element.x < headingElements.referralsElement.x);  // the description elements are to the left of the "Referrals/" heading
+    
     let description = "";
+    let previousY = undefined;
+    for (let descriptionElement of descriptionElements) {
+        if (previousY !== undefined && descriptionElement.y > previousY + descriptionElement.height / 2)  // a new line
+            description += " ";
+        description += descriptionElement.text;
+        previousY = descriptionElement.y;
+    }
 
     return {
         applicationNumber: applicationNumber,
@@ -549,7 +581,7 @@ async function main() {
     }
 
     pdfUrls.reverse();
-    
+
     // Select the most recent PDF.  And randomly select one other PDF (avoid processing all PDFs
     // at once because this may use too much memory, resulting in morph.io terminating the current
     // process).
