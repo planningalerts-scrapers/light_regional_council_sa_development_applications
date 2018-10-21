@@ -388,6 +388,12 @@ async function parsePdf(url: string) {
         let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
         elements.sort(elementComparer);
 
+        // Ignore the page number (the last element on the page).  Otherwise this will end up as
+        // part of a description.
+
+        if (/[0-9]+/.test(elements[elements.length - 1].text) && Number(elements[elements.length - 1].text) < 1000)
+            elements.pop();
+
         // Group the elements into sections based on where the "Lodgement" text starts (and other
         // element the "Lodgement" elements line up with horizontally with a margin of error equal
         // to about half the height of the "Lodgement" text).
@@ -503,14 +509,12 @@ async function main() {
     // at once because this may use too much memory, resulting in morph.io terminating the current
     // process).
 
-let selectedPdfUrls = pdfUrls;
-
-    // let selectedPdfUrls: string[] = [];
-    // selectedPdfUrls.push(pdfUrls.shift());
-    // if (pdfUrls.length > 0)
-    //     selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
-    // if (getRandom(0, 2) === 0)
-    //     selectedPdfUrls.reverse();
+    let selectedPdfUrls: string[] = [];
+    selectedPdfUrls.push(pdfUrls.shift());
+    if (pdfUrls.length > 0)
+        selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+    if (getRandom(0, 2) === 0)
+        selectedPdfUrls.reverse();
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
