@@ -305,19 +305,36 @@ function parseApplicationElements(elements: Element[], startElement: Element, he
 
 console.log("Consider also extracting the \"Received Date\".");
 
-    let receivedDate: moment.Moment = undefined;
-    let receivedDateRectangle : Rectangle = { x: headingElements.applicationElement.x, y: 0, width: headingElements.applicationElement.width, height : headingElements.applicationElement.height };
+    let applicationDateElement: Element = undefined;  // moment.Moment = undefined;
+    let applicationDateRectangle : Rectangle = { x: headingElements.applicationElement.x, y: 0, width: headingElements.applicationElement.width, height : headingElements.applicationElement.height };
     for (let element of elements) {
-        receivedDateRectangle.y = element.y;
+        applicationDateRectangle.y = element.y;
         if (getArea(element) > 0 &&  // ensure a valid element
-            getArea(element) > 0.5 * getArea(receivedDateRectangle) &&  // ensure that the element is approximately the same size (within 50%) as what is expected for the date rectangle
-            getArea(intersect(element, receivedDateRectangle)) > 0.75 * getArea(element)) {  // determine if the element mostly overlaps (by more than 75%) the rectangle where the date is expected to appear
-            receivedDate = moment(element.text.trim(), "D/MM/YYYY", true);
+            getArea(element) > 0.5 * getArea(applicationDateRectangle) &&  // ensure that the element is approximately the same size (within 50%) as what is expected for the date rectangle
+            getArea(intersect(element, applicationDateRectangle)) > 0.75 * getArea(element)) {  // determine if the element mostly overlaps (by more than 75%) the rectangle where the date is expected to appear
+                applicationDateElement = element;
             break;
         }
     }
+    if (applicationDateElement === undefined) {
+        let elementSummary = elements.map(element => `[${element.text}]`).join("");
+        console.log(`Could not find the application date on the PDF page for the current development application.  The development application will be ignored.  Elements: ${elementSummary}`);
+        return undefined;
+    }
+
+    let receivedDate = moment(applicationDateElement.text.trim(), "D/MM/YYYY", true);
     
-    let address = "";
+    // Get the address.
+
+    let address = elements
+        .filter(element =>
+            element.x > applicationDateElement.x + applicationDateElement.width &&  // the address elments must be to the right of the application date
+            getVerticalOverlapPercentage(applicationDateElement, element) > 50 &&  // the address element must overlap vertically with the application date element
+            element.x < headingElements.proposalElement.x - headingElements.proposalElement.height / 2)  // the address element must be at least a little to the left of the "Proposal" heading text (arbitrarily use half the height)
+        .sort(xComparer)
+        .map(element => element.text)
+        .join("");
+
     let description = "";
 
     return {
@@ -531,6 +548,8 @@ async function main() {
         return;
     }
 
+    pdfUrls.reverse();
+    
     // Select the most recent PDF.  And randomly select one other PDF (avoid processing all PDFs
     // at once because this may use too much memory, resulting in morph.io terminating the current
     // process).
