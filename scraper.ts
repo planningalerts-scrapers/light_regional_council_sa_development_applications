@@ -301,7 +301,7 @@ function parseApplicationElements(elements: Element[], startElement: Element, ap
 }
 
 // Finds the start element of each development application on the current PDF page (there are
-// typically two development applications on a single page and each development application
+// typically many development applications on a single page and each development application
 // typically begins with the text "Lodgement").
 
 function findStartElements(elements: Element[]) {
