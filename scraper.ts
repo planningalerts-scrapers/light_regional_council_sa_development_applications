@@ -158,99 +158,12 @@ function getRightElement(elements: Element[], element: Element) {
     return (closestElement.text === undefined) ? undefined : closestElement;
 }
 
-// Gets the text to the right in a rectangle, where the rectangle is delineated by the positions
-// in which the three specified strings of (case sensitive) text are found.
-
-function getRightText(elements: Element[], topLeftText: string, rightText: string, bottomText: string) {
-    // Construct a bounding rectangle in which the expected text should appear.  Any elements
-    // over 50% within the bounding rectangle will be assumed to be part of the expected text.
-
-    let topLeftElement = elements.find(element => element.text.trim() === topLeftText || element.text.trim() === topLeftText + ":");
-    let rightElement = (rightText === undefined) ? undefined : elements.find(element => element.text.trim() === rightText || element.text.trim() === rightText + ":");
-    let bottomElement = (bottomText === undefined) ? undefined: elements.find(element => element.text.trim() === bottomText || element.text.trim() === bottomText + ":");
-    if (topLeftElement === undefined)
-        return undefined;
-
-    let x = topLeftElement.x + topLeftElement.width;
-    let y = topLeftElement.y;
-    let width = (rightElement === undefined) ? Number.MAX_VALUE : (rightElement.x - x);
-    let height = (bottomElement === undefined) ? Number.MAX_VALUE : (bottomElement.y - y);
-
-    let bounds: Rectangle = { x: x, y: y, width: width, height: height };
-
-    // Gather together all elements that are at least 50% within the bounding rectangle.
-
-    let intersectingElements: Element[] = []
-    for (let element of elements) {
-        let intersectingBounds = intersect(element, bounds);
-        let intersectingArea = intersectingBounds.width * intersectingBounds.height;
-        let elementArea = element.width * element.height;
-        if (elementArea > 0 && intersectingArea * 2 > elementArea && element.text !== ":")
-            intersectingElements.push(element);
-    }
-
-    // Sort the elements by Y co-ordinate and then by X co-ordinate.
-
-    let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
-    intersectingElements.sort(elementComparer);
-
-    // Join the elements into a single string.
-
-    return intersectingElements.map(element => element.text).join(" ").trim().replace(/\s\s+/g, " ");
-}
-
-// Gets the text to the left in a rectangle, where the rectangle is delineated by the positions
-// in which the three specified strings of (case sensitive) text are found.
-
-function getLeftText(elements: Element[], topRightText: string, leftText: string, bottomText: string) {
-    // Construct a bounding rectangle in which the expected text should appear.  Any elements
-    // over 50% within the bounding rectangle will be assumed to be part of the expected text.
-
-    let topRightElement = elements.find(element => element.text.trim() === topRightText || element.text.trim() === topRightText + ":");
-    let leftElement = (leftText === undefined) ? undefined : elements.find(element => element.text.trim() === leftText || element.text.trim() === leftText + ":");
-    let bottomElement = (bottomText === undefined) ? undefined: elements.find(element => element.text.trim() === bottomText || element.text.trim() === bottomText + ":");
-    if (topRightElement === undefined)
-        return undefined;
-
-    let x = (leftElement === undefined) ? 0 : (leftElement.x + leftElement.width);
-    let y = topRightElement.y;
-    let width = topRightElement.x - x;
-    let height = (bottomElement === undefined) ? Number.MAX_VALUE : (bottomElement.y - y);
-
-    let bounds: Rectangle = { x: x, y: y, width: width, height: height };
-
-    // Gather together all elements that are at least 50% within the bounding rectangle.
-
-    let intersectingElements: Element[] = []
-    for (let element of elements) {
-        let intersectingBounds = intersect(element, bounds);
-        let intersectingArea = intersectingBounds.width * intersectingBounds.height;
-        let elementArea = element.width * element.height;
-        if (elementArea > 0 && intersectingArea * 2 > elementArea && element.text !== ":")
-            intersectingElements.push(element);
-    }
-
-    // Sort the elements by Y co-ordinate and then by X co-ordinate.
-
-    let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
-    intersectingElements.sort(elementComparer);
-
-    // Join the elements into a single string.
-
-    return intersectingElements.map(element => element.text).join(" ").trim().replace(/\s\s+/g, " ");
-}
-
 // Formats (and corrects) an address.
 
 function formatAddress(address: string) {
     address = address.trim();
     if (address === "")
         return "";
-
-    // Remove the bracketted number that often appears at the end of a property address.  For
-    // example, "7 McAdam RD PORT AUGUSTA (3743)" is changed to "7 McAdam RD PORT AUGUSTA".
-
-    address = address.replace(/ \([0-9]+\)$/, "").replace(/ \([0-9]*$/, "");
 
     // Pop tokens from the end of the array until a valid suburb name is encountered (allowing
     // for a few spelling errors).
@@ -267,8 +180,10 @@ function formatAddress(address: string) {
         }
     }
 
-    if (suburbName === null)  // suburb name not found (or not recognised)
+    if (suburbName === null) {  // suburb name not found (or not recognised)
+        console.log(`The state and post code will not be added because the suburb was not recognised: ${address}`);
         return address;
+    }
 
     // Add the suburb name with its state and post code to the street name.
 
@@ -352,6 +267,8 @@ function parseApplicationElements(elements: Element[], startElement: Element, he
         .sort(xComparer)
         .map(element => element.text)
         .join("");
+
+    address = formatAddress(address);  // add the state and post code to the address
 
     // Get the description.
 
@@ -586,12 +503,14 @@ async function main() {
     // at once because this may use too much memory, resulting in morph.io terminating the current
     // process).
 
-    let selectedPdfUrls: string[] = [];
-    selectedPdfUrls.push(pdfUrls.shift());
-    if (pdfUrls.length > 0)
-        selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
-    if (getRandom(0, 2) === 0)
-        selectedPdfUrls.reverse();
+let selectedPdfUrls = pdfUrls;
+
+    // let selectedPdfUrls: string[] = [];
+    // selectedPdfUrls.push(pdfUrls.shift());
+    // if (pdfUrls.length > 0)
+    //     selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+    // if (getRandom(0, 2) === 0)
+    //     selectedPdfUrls.reverse();
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
