@@ -419,7 +419,7 @@ async function parsePdf(url: string) {
         }
 
         // Group the elements into sections based on where the "Lodgement" text starts (and other
-        // element the "Lodgement" elements line up with horizontally with a margin of error equal
+        // elements the "Lodgement" elements line up with horizontally with a margin of error equal
         // to about half the height of the "Lodgement" text).
 
         let applicationElementGroups = [];
