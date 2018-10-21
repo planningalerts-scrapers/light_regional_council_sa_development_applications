@@ -111,6 +111,12 @@ function intersect(rectangle1: Rectangle, rectangle2: Rectangle): Rectangle {
         return { x: 0, y: 0, width: 0, height: 0 };
 }
 
+// Calculates the area of a rectangle.
+
+function getArea(rectangle: Rectangle) {
+    return rectangle.width * rectangle.height;
+}
+
 // Calculates the square of the Euclidean distance between two elements.
 
 function calculateDistance(element1: Element, element2: Element) {
@@ -295,11 +301,24 @@ function parseApplicationElements(elements: Element[], startElement: Element, he
     }
     console.log(`    Found \"${applicationNumber}\".`);
 
-    // Construct the resulting application information.
+    // Get the received date.
+
+console.log("Consider also extracting the \"Received Date\".");
+
+    let receivedDate: moment.Moment = undefined;
+    let receivedDateRectangle : Rectangle = { x: headingElements.applicationElement.x, y: 0, width: headingElements.applicationElement.width, height : headingElements.applicationElement.height };
+    for (let element of elements) {
+        receivedDateRectangle.y = element.y;
+        if (getArea(element) > 0 &&  // ensure a valid element
+            getArea(element) > 0.5 * getArea(receivedDateRectangle) &&  // ensure that the element is approximately the same size (within 50%) as what is expected for the date rectangle
+            getArea(intersect(element, receivedDateRectangle)) > 0.75 * getArea(element)) {  // determine if the element mostly overlaps (by more than 75%) the rectangle where the date is expected to appear
+            receivedDate = moment(element.text.trim(), "D/MM/YYYY", true);
+            break;
+        }
+    }
     
     let address = "";
     let description = "";
-    let receivedDate = undefined;
 
     return {
         applicationNumber: applicationNumber,
