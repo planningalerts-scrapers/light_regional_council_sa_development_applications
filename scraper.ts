@@ -504,7 +504,7 @@ async function main() {
         let pdfUrl = new urlparser.URL(element.attribs.href, DevelopmentApplicationsUrl);
         if (pdfUrl.href.toLowerCase().includes(".pdf"))
             if (!pdfUrls.some(url => url === pdfUrl.href))  // avoid duplicates
-                pdfUrls.unshift(pdfUrl.href);
+                pdfUrls.push(pdfUrl.href);
     }
 
     if (pdfUrls.length === 0) {
