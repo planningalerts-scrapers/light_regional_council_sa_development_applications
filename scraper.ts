@@ -17,7 +17,7 @@ import * as didyoumean from "didyoumean2";
 
 sqlite3.verbose();
 
-const DevelopmentApplicationsUrl = "https://www.light.sa.gov.au/applicationregister";
+const DevelopmentApplicationsUrl = "https://www.light.sa.gov.au/develop/applicationregister";
 const CommentUrl = "mailto:light@light.sa.gov.au";
 
 declare const process: any;
@@ -56,7 +56,7 @@ async function insertRow(database, developmentApplication) {
                 console.error(error);
                 reject(error);
             } else {
-                console.log(`    Saved: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\", description \"${developmentApplication.description}\" and received date \"${developmentApplication.receivedDate}\" into the database.`);
+                console.log(`    Saved application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\", description \"${developmentApplication.description}\" and received date \"${developmentApplication.receivedDate}\" to the database.`);
                 sqlStatement.finalize();  // releases any locks
                 resolve(row);
             }
@@ -337,8 +337,8 @@ function findStartElements(elements: Element[]) {
         if (matches.length > 0) {
             let bestMatch = matches.reduce((previous, current) =>
                 (previous === undefined ||
-                previous.threshold < current.threshold ||
-                (previous.threshold === current.threshold && Math.abs(previous.text.length - "Lodgement".length) <= Math.abs(current.text.length - "Lodgement".length)) ? current : previous), undefined);
+                current.threshold < previous.threshold ||
+                (current.threshold === previous.threshold && Math.abs(current.text.trim().length - "Lodgement".length) <= Math.abs(previous.text.trim().length - "Lodgement".length)) ? current : previous), undefined);
             startElements.push(bestMatch.element);
         }
     }
@@ -500,10 +500,11 @@ async function main() {
     let $ = cheerio.load(body);
     
     let pdfUrls: string[] = [];
-    for (let element of $("td.u6ListTD a[href$='.pdf']").get()) {
+    for (let element of $("td.u6ListTD a").get()) {
         let pdfUrl = new urlparser.URL(element.attribs.href, DevelopmentApplicationsUrl);
-        if (!pdfUrls.some(url => url === pdfUrl.href))  // avoid duplicates
-            pdfUrls.push(pdfUrl.href);
+        if (pdfUrl.href.toLowerCase().includes(".pdf"))
+            if (!pdfUrls.some(url => url === pdfUrl.href))  // avoid duplicates
+                pdfUrls.push(pdfUrl.href);
     }
 
     if (pdfUrls.length === 0) {
@@ -520,7 +521,7 @@ async function main() {
     let selectedPdfUrls: string[] = [];
     selectedPdfUrls.push(pdfUrls.shift());
     if (pdfUrls.length > 0)
-        selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+        selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
     if (getRandom(0, 2) === 0)
         selectedPdfUrls.reverse();
 
