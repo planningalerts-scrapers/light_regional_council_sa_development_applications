@@ -17,7 +17,7 @@ import * as didyoumean from "didyoumean2";
 
 sqlite3.verbose();
 
-const DevelopmentApplicationsUrl = "https://www.light.sa.gov.au/applicationregister";
+const DevelopmentApplicationsUrl = "https://www.light.sa.gov.au/develop/applicationregister";
 const CommentUrl = "mailto:light@light.sa.gov.au";
 
 declare const process: any;
@@ -42,7 +42,7 @@ async function initializeDatabase() {
 
 async function insertRow(database, developmentApplication) {
     return new Promise((resolve, reject) => {
-        let sqlStatement = database.prepare("insert or ignore into [data] values (?, ?, ?, ?, ?, ?, ?)");
+        let sqlStatement = database.prepare("insert or replace into [data] values (?, ?, ?, ?, ?, ?, ?)");
         sqlStatement.run([
             developmentApplication.applicationNumber,
             developmentApplication.address,
@@ -56,10 +56,7 @@ async function insertRow(database, developmentApplication) {
                 console.error(error);
                 reject(error);
             } else {
-                if (this.changes > 0)
-                    console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\", description \"${developmentApplication.description}\" and received date \"${developmentApplication.receivedDate}\" into the database.`);
-                else
-                    console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\", description \"${developmentApplication.description}\" and received date \"${developmentApplication.receivedDate}\" because it was already present in the database.`);
+                console.log(`    Saved application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\", description \"${developmentApplication.description}\" and received date \"${developmentApplication.receivedDate}\" to the database.`);
                 sqlStatement.finalize();  // releases any locks
                 resolve(row);
             }
@@ -507,7 +504,7 @@ async function main() {
         let pdfUrl = new urlparser.URL(element.attribs.href, DevelopmentApplicationsUrl);
         if (pdfUrl.href.toLowerCase().includes(".pdf"))
             if (!pdfUrls.some(url => url === pdfUrl.href))  // avoid duplicates
-                pdfUrls.push(pdfUrl.href);
+                pdfUrls.unshift(pdfUrl.href);
     }
 
     if (pdfUrls.length === 0) {
